@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Actra — Personal Daily Activity Tracker</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0f;
+      --surface: #111118;
+      --surface2: #16161f;
+      --border: rgba(255,255,255,0.07);
+      --accent: #7c6aff;
+      --accent2: #ff6a9b;
+      --accent3: #6affd4;
+      --text: #e8e8f0;
+      --muted: #6b6b80;
+      --card-glow: rgba(124, 106, 255, 0.08);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 14px;
+      line-height: 1.7;
+      overflow-x: hidden;
+    }
+
+    /* Noise texture overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 1000;
+      opacity: 0.4;
+    }
+
+    /* Ambient glow blobs */
+    .blob {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(120px);
+      opacity: 0.12;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .blob-1 { width: 600px; height: 600px; background: var(--accent); top: -200px; left: -200px; animation: drift1 20s ease-in-out infinite; }
+    .blob-2 { width: 500px; height: 500px; background: var(--accent2); bottom: 10%; right: -150px; animation: drift2 25s ease-in-out infinite; }
+    .blob-3 { width: 400px; height: 400px; background: var(--accent3); top: 50%; left: 40%; animation: drift3 18s ease-in-out infinite; }
+
+    @keyframes drift1 { 0%,100%{transform:translate(0,0)} 50%{transform:translate(60px,40px)} }
+    @keyframes drift2 { 0%,100%{transform:translate(0,0)} 50%{transform:translate(-50px,30px)} }
+    @keyframes drift3 { 0%,100%{transform:translate(0,0)} 50%{transform:translate(30px,-60px)} }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 0 32px;
+      position: relative;
+      z-index: 2;
+    }
+
+    /* NAV */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      padding: 20px 0;
+      background: rgba(10,10,15,0.7);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+    }
+    nav .container { display: flex; align-items: center; justify-content: space-between; }
+    .nav-logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 20px; color: var(--text); letter-spacing: -0.5px; }
+    .nav-logo span { color: var(--accent); }
+    .nav-links { display: flex; gap: 28px; list-style: none; }
+    .nav-links a { color: var(--muted); text-decoration: none; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; transition: color 0.2s; }
+    .nav-links a:hover { color: var(--text); }
+    .nav-badge { background: rgba(124,106,255,0.15); border: 1px solid rgba(124,106,255,0.3); color: var(--accent); font-size: 11px; padding: 4px 12px; border-radius: 20px; letter-spacing: 0.06em; }
+
+    /* HERO */
+    .hero { padding: 160px 0 100px; text-align: center; }
+    .hero-eyebrow {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(124,106,255,0.1); border: 1px solid rgba(124,106,255,0.25);
+      border-radius: 30px; padding: 6px 16px; font-size: 11px; letter-spacing: 0.12em;
+      text-transform: uppercase; color: var(--accent); margin-bottom: 32px;
+      animation: fadeUp 0.8s ease both;
+    }
+    .hero-eyebrow::before { content:''; width:6px; height:6px; background:var(--accent); border-radius:50%; animation:pulse 2s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.5;transform:scale(1.4)} }
+
+    .hero h1 {
+      font-family: 'Syne', sans-serif; font-weight: 800;
+      font-size: clamp(48px, 8vw, 88px); line-height: 1.0; letter-spacing: -3px;
+      color: var(--text); margin-bottom: 16px; animation: fadeUp 0.8s 0.1s ease both;
+    }
+    .hero h1 .highlight {
+      font-family: 'Instrument Serif', serif; font-style: italic; font-weight: 400;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .hero-tagline { font-family: 'Instrument Serif', serif; font-style: italic; font-size: 20px; color: var(--muted); margin-bottom: 20px; animation: fadeUp 0.8s 0.2s ease both; }
+    .hero-desc { font-size: 15px; color: var(--muted); max-width: 520px; margin: 0 auto 48px; line-height: 1.8; animation: fadeUp 0.8s 0.3s ease both; }
+    .hero-cta { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; animation: fadeUp 0.8s 0.4s ease both; }
+
+    .btn { font-family: 'DM Mono', monospace; font-size: 13px; padding: 14px 28px; border-radius: 8px; text-decoration: none; letter-spacing: 0.04em; transition: all 0.25s; cursor: pointer; border: none; }
+    .btn-primary { background: var(--accent); color: #fff; box-shadow: 0 0 40px rgba(124,106,255,0.3); }
+    .btn-primary:hover { background: #9080ff; transform: translateY(-2px); box-shadow: 0 0 60px rgba(124,106,255,0.45); }
+    .btn-secondary { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+    .btn-secondary:hover { border-color: rgba(255,255,255,0.2); color: var(--text); transform: translateY(-2px); }
+
+    @keyframes fadeUp { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
+
+    .divider { height: 1px; background: linear-gradient(90deg, transparent, var(--border), transparent); }
+
+    section { padding: 80px 0; }
+    .section-label { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent); margin-bottom: 12px; }
+    .section-title { font-family: 'Syne', sans-serif; font-weight: 700; font-size: clamp(28px, 4vw, 40px); letter-spacing: -1.5px; color: var(--text); margin-bottom: 16px; line-height: 1.1; }
+    .section-sub { color: var(--muted); font-size: 14px; max-width: 480px; margin-bottom: 48px; line-height: 1.8; }
+
+    /* FEATURE GRID */
+    .features-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 2px; background: var(--border); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
+    .feature-card { background: var(--surface); padding: 28px 24px; transition: background 0.2s; position: relative; overflow: hidden; }
+    .feature-card::before { content:''; position:absolute; inset:0; background:var(--card-glow); opacity:0; transition:opacity 0.3s; }
+    .feature-card:hover::before { opacity:1; }
+    .feature-card:hover { background: var(--surface2); }
+    .feature-icon { font-size: 22px; margin-bottom: 14px; display: block; }
+    .feature-name { font-family: 'Syne', sans-serif; font-weight: 600; font-size: 14px; color: var(--text); margin-bottom: 6px; letter-spacing: -0.3px; }
+    .feature-desc { font-size: 12px; color: var(--muted); line-height: 1.7; }
+
+    /* UPCOMING PILLS */
+    .upcoming-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+    .pill { display:flex; align-items:center; gap:8px; padding:10px 18px; background:var(--surface); border:1px solid var(--border); border-radius:100px; font-size:13px; color:var(--muted); transition:all 0.2s; }
+    .pill:hover { border-color:rgba(124,106,255,0.3); color:var(--text); background:rgba(124,106,255,0.06); transform:translateY(-2px); }
+    .pill .icon { font-size:15px; }
+
+    /* TECH STACK */
+    .stack-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .stack-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:24px; transition:border-color 0.2s, transform 0.2s; }
+    .stack-card:hover { border-color:rgba(124,106,255,0.3); transform:translateY(-3px); }
+    .stack-card-title { font-family:'Syne',sans-serif; font-weight:700; font-size:11px; letter-spacing:0.15em; text-transform:uppercase; margin-bottom:16px; }
+    .stack-card:nth-child(1) .stack-card-title { color:var(--accent); }
+    .stack-card:nth-child(2) .stack-card-title { color:var(--accent2); }
+    .stack-card:nth-child(3) .stack-card-title { color:var(--accent3); }
+    .stack-item { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); margin-bottom:8px; }
+    .stack-dot { width:5px; height:5px; border-radius:50%; background:var(--muted); flex-shrink:0; }
+
+    /* CODE BLOCK */
+    .code-block { background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+    .code-header { display:flex; align-items:center; gap:8px; padding:14px 20px; border-bottom:1px solid var(--border); background:rgba(255,255,255,0.02); }
+    .dot-red { width:10px;height:10px;border-radius:50%;background:#ff5f57; }
+    .dot-yellow { width:10px;height:10px;border-radius:50%;background:#febc2e; }
+    .dot-green { width:10px;height:10px;border-radius:50%;background:#28c840; }
+    .code-title { font-size:12px; color:var(--muted); margin-left:8px; letter-spacing:0.04em; }
+    .code-body { padding:24px 28px; font-size:13px; line-height:2; color:var(--muted); overflow-x:auto; }
+    .code-body pre { white-space: pre; }
+    .folder { color:var(--accent); }
+    .file-name { color:var(--text); }
+    .comment { color:var(--muted); opacity:0.6; }
+    .tree-line { color:rgba(255,255,255,0.15); }
+
+    /* STEPS */
+    .steps { display:flex; flex-direction:column; gap:2px; background:var(--border); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
+    .step { background:var(--surface); padding:28px 32px; display:grid; grid-template-columns:48px 1fr; gap:20px; align-items:start; transition:background 0.2s; }
+    .step:hover { background:var(--surface2); }
+    .step-num { font-family:'Syne',sans-serif; font-weight:800; font-size:28px; color:rgba(124,106,255,0.25); line-height:1; margin-top:4px; }
+    .step-title { font-family:'Syne',sans-serif; font-weight:700; font-size:16px; color:var(--text); margin-bottom:12px; letter-spacing:-0.3px; }
+    .step-code { background:rgba(0,0,0,0.4); border:1px solid var(--border); border-radius:8px; padding:14px 18px; font-size:12px; color:var(--accent3); line-height:1.9; margin-top:10px; overflow-x:auto; }
+    .env-key { color:var(--accent2); }
+    .env-val { color:var(--muted); }
+
+    /* DATABASE SCHEMA */
+    .schema-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+    .schema-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden; transition:border-color 0.2s; }
+    .schema-card:hover { border-color:rgba(124,106,255,0.25); }
+    .schema-header { padding:14px 18px; border-bottom:1px solid var(--border); font-family:'DM Mono',monospace; font-size:12px; display:flex; align-items:center; gap:8px; }
+    .table-name { color:var(--accent3); font-weight:500; }
+    .schema-body { padding:14px 18px; }
+    .schema-field { display:flex; justify-content:space-between; font-size:12px; padding:5px 0; border-bottom:1px solid rgba(255,255,255,0.03); }
+    .schema-field:last-child { border-bottom:none; }
+    .field-name { color:var(--text); }
+    .field-type { color:var(--muted); font-size:11px; }
+    .field-pk { color:var(--accent); font-size:10px; letter-spacing:0.06em; }
+    .field-fk { color:var(--accent2); font-size:10px; letter-spacing:0.06em; }
+
+    /* API OVERVIEW */
+    .api-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+    .api-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+    .api-card-header { padding:14px 18px; border-bottom:1px solid var(--border); font-family:'Syne',sans-serif; font-weight:700; font-size:12px; letter-spacing:0.1em; text-transform:uppercase; }
+    .api-card:nth-child(1) .api-card-header { color:var(--accent2); }
+    .api-card:nth-child(2) .api-card-header { color:var(--accent); }
+    .api-card:nth-child(3) .api-card-header { color:var(--accent3); }
+    .api-route { display:flex; gap:10px; align-items:center; padding:10px 18px; border-bottom:1px solid rgba(255,255,255,0.03); font-size:12px; }
+    .api-route:last-child { border-bottom:none; }
+    .method { font-size:10px; font-weight:500; padding:2px 7px; border-radius:4px; letter-spacing:0.06em; min-width:42px; text-align:center; }
+    .method.get { background:rgba(106,255,212,0.12); color:var(--accent3); }
+    .method.post { background:rgba(124,106,255,0.12); color:var(--accent); }
+    .method.put { background:rgba(255,196,0,0.12); color:#ffc400; }
+    .method.delete { background:rgba(255,106,155,0.12); color:var(--accent2); }
+    .route-path { color:var(--muted); font-size:12px; }
+
+    /* VISION */
+    .vision-card { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:48px; text-align:center; position:relative; overflow:hidden; }
+    .vision-card::before { content:''; position:absolute; inset:0; background:radial-gradient(ellipse at 50% 0%, rgba(124,106,255,0.08) 0%, transparent 70%); }
+    .vision-card blockquote { font-family:'Instrument Serif',serif; font-style:italic; font-size:clamp(18px,3vw,26px); color:var(--text); line-height:1.6; margin-bottom:32px; position:relative; }
+    .vision-tags { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+    .vision-tag { background:rgba(124,106,255,0.1); border:1px solid rgba(124,106,255,0.2); color:var(--accent); font-size:12px; padding:6px 16px; border-radius:100px; }
+
+    /* CONTRIBUTE */
+    .contribute-steps { display:grid; grid-template-columns:repeat(4,1fr); gap:2px; background:var(--border); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+    .contrib-step { background:var(--surface); padding:24px 20px; text-align:center; transition:background 0.2s; }
+    .contrib-step:hover { background:var(--surface2); }
+    .contrib-num { font-family:'Syne',sans-serif; font-weight:800; font-size:32px; color:rgba(124,106,255,0.2); margin-bottom:10px; }
+    .contrib-title { font-family:'Syne',sans-serif; font-weight:600; font-size:13px; color:var(--text); margin-bottom:6px; }
+    .contrib-desc { font-size:11px; color:var(--muted); }
+
+    /* FOOTER */
+    footer { padding:60px 0 40px; border-top:1px solid var(--border); text-align:center; }
+    .footer-logo { font-family:'Syne',sans-serif; font-weight:800; font-size:32px; letter-spacing:-1px; color:var(--text); margin-bottom:12px; }
+    .footer-logo span { color:var(--accent); }
+    .footer-tagline { font-family:'Instrument Serif',serif; font-style:italic; font-size:16px; color:var(--muted); margin-bottom:32px; }
+    .footer-links { display:flex; gap:24px; justify-content:center; list-style:none; margin-bottom:32px; }
+    .footer-links a { color:var(--muted); text-decoration:none; font-size:12px; text-transform:uppercase; letter-spacing:0.08em; transition:color 0.2s; }
+    .footer-links a:hover { color:var(--text); }
+    .footer-copy { font-size:11px; color:rgba(255,255,255,0.15); }
+    .mit-badge { display:inline-flex; align-items:center; gap:6px; background:rgba(106,255,212,0.08); border:1px solid rgba(106,255,212,0.15); color:var(--accent3); font-size:11px; padding:5px 14px; border-radius:100px; margin-bottom:24px; }
+
+    @media(max-width:768px) {
+      .nav-links { display:none; }
+      .hero { padding:120px 0 80px; }
+      .stack-grid, .api-grid, .schema-grid { grid-template-columns:1fr; }
+      .contribute-steps { grid-template-columns:repeat(2,1fr); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+
+  <!-- NAV -->
+  <nav>
+    <div class="container">
+      <div class="nav-logo">Actr<span>a</span></div>
+      <ul class="nav-links">
+        <li><a href="#features">Features</a></li>
+        <li><a href="#stack">Stack</a></li>
+        <li><a href="#setup">Setup</a></li>
+        <li><a href="#api">API</a></li>
+        <li><a href="#contribute">Contribute</a></li>
+      </ul>
+      <div class="nav-badge">MVP</div>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="container">
+      <div class="hero-eyebrow">Personal Daily Activity Tracker</div>
+      <h1>Build Better<br/><span class="highlight">Habits Daily</span></h1>
+      <p class="hero-tagline">«Build consistency. Track your day. Improve your life.»</p>
+      <p class="hero-desc">Actra is a modern daily activity &amp; habit tracking web app that helps users stay consistent, measure progress, and build better routines.</p>
+      <div class="hero-cta">
+        <a href="#setup" class="btn btn-primary">→ Get Started</a>
+        <a href="#features" class="btn btn-secondary">Explore Features</a>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- MVP FEATURES -->
+  <section id="features">
+    <div class="container">
+      <div class="section-label">✨ MVP Features</div>
+      <h2 class="section-title">Everything you need<br/>to start tracking</h2>
+      <p class="section-sub">Core features packed into a clean, fast, and focused experience for building daily consistency.</p>
+      <div class="features-grid">
+        <div class="feature-card">
+          <span class="feature-icon">🔐</span>
+          <div class="feature-name">Authentication</div>
+          <div class="feature-desc">Secure register &amp; login with JWT-based session management.</div>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">📝</span>
+          <div class="feature-name">Activity Management</div>
+          <div class="feature-desc">Create, update, and delete activities with ease. Full CRUD support.</div>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">📅</span>
+          <div class="feature-name">Daily Tracking</div>
+          <div class="feature-desc">Log your activities for any day and keep a history of your performance.</div>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">✅</span>
+          <div class="feature-name">Task Completion</div>
+          <div class="feature-desc">Mark tasks as complete and visualize what you've accomplished today.</div>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">📊</span>
+          <div class="feature-name">Progress Tracking</div>
+          <div class="feature-desc">See your daily completion percentage and measure consistency over time.</div>
+        </div>
+        <div class="feature-card">
+          <span class="feature-icon">📱</span>
+          <div class="feature-name">Responsive Design</div>
+          <div class="feature-desc">Fully mobile-friendly. Track your habits anywhere, any device.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- UPCOMING -->
+  <section id="upcoming">
+    <div class="container">
+      <div class="section-label">🔥 Upcoming Features</div>
+      <h2 class="section-title">The roadmap ahead</h2>
+      <p class="section-sub">Actra is just getting started. Here's what's coming next.</p>
+      <div class="upcoming-grid">
+        <div class="pill"><span class="icon">🔥</span> Streak Tracking</div>
+        <div class="pill"><span class="icon">📅</span> Calendar View</div>
+        <div class="pill"><span class="icon">📊</span> GitHub-style Heatmap</div>
+        <div class="pill"><span class="icon">📈</span> Analytics Dashboard</div>
+        <div class="pill"><span class="icon">🔔</span> Notifications (PWA)</div>
+        <div class="pill"><span class="icon">📧</span> Email Reports</div>
+        <div class="pill"><span class="icon">🎯</span> Goal Setting</div>
+        <div class="pill"><span class="icon">🧠</span> Smart Insights</div>
+        <div class="pill"><span class="icon">🌙</span> Dark Mode</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- TECH STACK -->
+  <section id="stack">
+    <div class="container">
+      <div class="section-label">🛠 Tech Stack</div>
+      <h2 class="section-title">Built with modern tools</h2>
+      <p class="section-sub">A clean, production-ready stack chosen for speed, simplicity, and scalability.</p>
+      <div class="stack-grid">
+        <div class="stack-card">
+          <div class="stack-card-title">Frontend</div>
+          <div class="stack-item"><span class="stack-dot"></span> React (Vite)</div>
+          <div class="stack-item"><span class="stack-dot"></span> Axios</div>
+          <div class="stack-item"><span class="stack-dot"></span> React Router</div>
+        </div>
+        <div class="stack-card">
+          <div class="stack-card-title">Backend</div>
+          <div class="stack-item"><span class="stack-dot"></span> Node.js (Express)</div>
+          <div class="stack-item"><span class="stack-dot"></span> JWT Authentication</div>
+          <div class="stack-item"><span class="stack-dot"></span> REST API</div>
+        </div>
+        <div class="stack-card">
+          <div class="stack-card-title">Database</div>
+          <div class="stack-item"><span class="stack-dot"></span> PostgreSQL</div>
+          <div class="stack-item"><span class="stack-dot"></span> Relational Schema</div>
+          <div class="stack-item"><span class="stack-dot"></span> Activity Logs</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- PROJECT STRUCTURE -->
+  <section id="structure">
+    <div class="container">
+      <div class="section-label">📁 Project Structure</div>
+      <h2 class="section-title">Clean architecture</h2>
+      <p class="section-sub">A well-organized monorepo with clear separation between client and server.</p>
+      <div class="code-block">
+        <div class="code-header">
+          <div class="dot-red"></div>
+          <div class="dot-yellow"></div>
+          <div class="dot-green"></div>
+          <span class="code-title">actra/ — repository root</span>
+        </div>
+        <div class="code-body">
+<pre><span class="folder">actra/</span>
+<span class="tree-line">│</span>
+<span class="tree-line">├── </span><span class="folder">client/</span>          <span class="comment"># React frontend (Vite)</span>
+<span class="tree-line">│   ├── </span><span class="folder">src/</span>
+<span class="tree-line">│   ├── </span><span class="folder">components/</span>
+<span class="tree-line">│   ├── </span><span class="folder">pages/</span>
+<span class="tree-line">│   └── </span><span class="folder">services/</span>
+<span class="tree-line">│</span>
+<span class="tree-line">├── </span><span class="folder">server/</span>          <span class="comment"># Node.js backend (Express)</span>
+<span class="tree-line">│   ├── </span><span class="folder">controllers/</span>
+<span class="tree-line">│   ├── </span><span class="folder">routes/</span>
+<span class="tree-line">│   ├── </span><span class="folder">models/</span>
+<span class="tree-line">│   ├── </span><span class="folder">middleware/</span>
+<span class="tree-line">│   └── </span><span class="folder">config/</span>
+<span class="tree-line">│</span>
+<span class="tree-line">└── </span><span class="file-name">README.md</span></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- SETUP -->
+  <section id="setup">
+    <div class="container">
+      <div class="section-label">⚙️ Getting Started</div>
+      <h2 class="section-title">Up and running<br/>in minutes</h2>
+      <p class="section-sub">Three simple steps to get your local development environment ready.</p>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">01</div>
+          <div>
+            <div class="step-title">Clone the repository</div>
+            <div style="color:var(--muted);font-size:13px;">Download the project and navigate into the directory.</div>
+            <div class="step-code">git clone https://github.com/your-username/actra.git<br/>cd actra</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">02</div>
+          <div>
+            <div class="step-title">Setup the Backend</div>
+            <div style="color:var(--muted);font-size:13px;">Install dependencies and configure your environment variables.</div>
+            <div class="step-code">cd server &amp;&amp; npm install<br/><br/><span class="comment"># Create .env file:</span><br/><span class="env-key">PORT</span>=<span class="env-val">5000</span><br/><span class="env-key">DATABASE_URL</span>=<span class="env-val">your_postgresql_connection</span><br/><span class="env-key">JWT_SECRET</span>=<span class="env-val">your_secret_key</span><br/><br/>npm run dev</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">03</div>
+          <div>
+            <div class="step-title">Setup the Frontend</div>
+            <div style="color:var(--muted);font-size:13px;">Install client dependencies and launch the dev server.</div>
+            <div class="step-code">cd client<br/>npm install<br/>npm run dev</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- DATABASE SCHEMA -->
+  <section id="schema">
+    <div class="container">
+      <div class="section-label">🗄 Database Schema</div>
+      <h2 class="section-title">MVP data model</h2>
+      <p class="section-sub">Three lean tables to power the core tracking experience.</p>
+      <div class="schema-grid">
+        <div class="schema-card">
+          <div class="schema-header"><span class="table-name">users</span></div>
+          <div class="schema-body">
+            <div class="schema-field"><span class="field-name">id</span><span class="field-pk">PK</span></div>
+            <div class="schema-field"><span class="field-name">name</span><span class="field-type">VARCHAR</span></div>
+            <div class="schema-field"><span class="field-name">email</span><span class="field-type">VARCHAR</span></div>
+            <div class="schema-field"><span class="field-name">password_hash</span><span class="field-type">VARCHAR</span></div>
+            <div class="schema-field"><span class="field-name">created_at</span><span class="field-type">TIMESTAMP</span></div>
+          </div>
+        </div>
+        <div class="schema-card">
+          <div class="schema-header"><span class="table-name">activities</span></div>
+          <div class="schema-body">
+            <div class="schema-field"><span class="field-name">id</span><span class="field-pk">PK</span></div>
+            <div class="schema-field"><span class="field-name">user_id</span><span class="field-fk">FK</span></div>
+            <div class="schema-field"><span class="field-name">title</span><span class="field-type">VARCHAR</span></div>
+            <div class="schema-field"><span class="field-name">category</span><span class="field-type">VARCHAR</span></div>
+            <div class="schema-field"><span class="field-name">created_at</span><span class="field-type">TIMESTAMP</span></div>
+          </div>
+        </div>
+        <div class="schema-card">
+          <div class="schema-header"><span class="table-name">activity_logs</span></div>
+          <div class="schema-body">
+            <div class="schema-field"><span class="field-name">id</span><span class="field-pk">PK</span></div>
+            <div class="schema-field"><span class="field-name">activity_id</span><span class="field-fk">FK</span></div>
+            <div class="schema-field"><span class="field-name">date</span><span class="field-type">DATE</span></div>
+            <div class="schema-field"><span class="field-name">status</span><span class="field-type">VARCHAR</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- API OVERVIEW -->
+  <section id="api">
+    <div class="container">
+      <div class="section-label">🔗 API Overview</div>
+      <h2 class="section-title">RESTful endpoints</h2>
+      <p class="section-sub">Clean and predictable routes for authentication, activity management, and log tracking.</p>
+      <div class="api-grid">
+        <div class="api-card">
+          <div class="api-card-header">Auth</div>
+          <div class="api-route"><span class="method post">POST</span><span class="route-path">/api/auth/register</span></div>
+          <div class="api-route"><span class="method post">POST</span><span class="route-path">/api/auth/login</span></div>
+        </div>
+        <div class="api-card">
+          <div class="api-card-header">Activities</div>
+          <div class="api-route"><span class="method get">GET</span><span class="route-path">/api/activities</span></div>
+          <div class="api-route"><span class="method post">POST</span><span class="route-path">/api/activities</span></div>
+          <div class="api-route"><span class="method put">PUT</span><span class="route-path">/api/activities/:id</span></div>
+          <div class="api-route"><span class="method delete">DEL</span><span class="route-path">/api/activities/:id</span></div>
+        </div>
+        <div class="api-card">
+          <div class="api-card-header">Logs</div>
+          <div class="api-route"><span class="method post">POST</span><span class="route-path">/api/logs</span></div>
+          <div class="api-route"><span class="method get">GET</span><span class="route-path">/api/logs/today</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- VISION -->
+  <section id="vision">
+    <div class="container">
+      <div class="section-label">🎯 Vision</div>
+      <h2 class="section-title">More than a tracker</h2>
+      <p class="section-sub">Actra is designed to evolve into a complete productivity system.</p>
+      <div class="vision-card">
+        <blockquote>
+          "Actra is designed to evolve into a complete productivity system — not just a tracker. Data-driven insights, behavior analysis, and smart habit optimization."
+        </blockquote>
+        <div class="vision-tags">
+          <span class="vision-tag">Data-driven insights</span>
+          <span class="vision-tag">Behavior analysis</span>
+          <span class="vision-tag">Smart habit optimization</span>
+          <span class="vision-tag">Productivity system</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- CONTRIBUTE -->
+  <section id="contribute">
+    <div class="container">
+      <div class="section-label">🤝 Contributing</div>
+      <h2 class="section-title">Join the project</h2>
+      <p class="section-sub">Contributions, ideas, and feedback are always welcome. Here's how to get involved.</p>
+      <div class="contribute-steps">
+        <div class="contrib-step">
+          <div class="contrib-num">01</div>
+          <div class="contrib-title">Fork the repo</div>
+          <div class="contrib-desc">Create your own copy of the project on GitHub.</div>
+        </div>
+        <div class="contrib-step">
+          <div class="contrib-num">02</div>
+          <div class="contrib-title">New branch</div>
+          <div class="contrib-desc">Create a feature or fix branch for your changes.</div>
+        </div>
+        <div class="contrib-step">
+          <div class="contrib-num">03</div>
+          <div class="contrib-title">Commit changes</div>
+          <div class="contrib-desc">Write clear, descriptive commit messages.</div>
+        </div>
+        <div class="contrib-step">
+          <div class="contrib-num">04</div>
+          <div class="contrib-title">Open a PR</div>
+          <div class="contrib-desc">Submit your pull request for review.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="container">
+      <div class="footer-logo">Actr<span>a</span></div>
+      <p class="footer-tagline">«Small actions every day build extraordinary results.»</p>
+      <div class="mit-badge">📄 MIT License</div>
+      <ul class="footer-links">
+        <li><a href="#features">Features</a></li>
+        <li><a href="#stack">Stack</a></li>
+        <li><a href="#setup">Setup</a></li>
+        <li><a href="#api">API</a></li>
+        <li><a href="#contribute">Contribute</a></li>
+      </ul>
+      <p class="footer-copy">Built with ♥ — Give it a ⭐ on GitHub if you like it!</p>
+    </div>
+  </footer>
+
+</body>
+</html>
